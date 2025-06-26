@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Directive - Daily Task Generator</title>
+</head>
+<body>
+    <h1>Directive</h1>
+    <p>Generate 5 simple daily tasks to bring you closer to your goals</p>
+    
+    <form id="taskForm">
+        <div>
+            <label for="goal">What do you want to become or achieve?</label>
+            <input type="text" id="goal" name="goal" placeholder="e.g., become a software engineer" required>
+        </div>
+        
+        <div>
+            <label for="context">Tell us about your current situation:</label>
+            <textarea id="context" name="context" placeholder="e.g., recent graduate with computer science degree" required></textarea>
+        </div>
+        
+        <button type="submit" id="submitBtn">Generate My Daily Tasks</button>
+    </form>
+    
+    <div id="results" style="display: none;">
+        <div id="loading">
+            <p>Generating your personalized tasks...</p>
+        </div>
+        <div id="taskResults"></div>
+    </div>
+
+    <script>
+        document.getElementById('taskForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const goal = document.getElementById('goal').value;
+            const context = document.getElementById('context').value;
+            const resultsDiv = document.getElementById('results');
+            const loadingDiv = document.getElementById('loading');
+            const taskResultsDiv = document.getElementById('taskResults');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            resultsDiv.style.display = 'block';
+            loadingDiv.style.display = 'block';
+            taskResultsDiv.innerHTML = '';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Generating...';
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ goal, context })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                loadingDiv.style.display = 'none';
+                
+                const tasksHtml = `
+                    <h3>Your Daily Tasks:</h3>
+                    <ol>
+                        ${data.tasks.map(task => `<li>${task}</li>`).join('')}
+                    </ol>
+                `;
+                
+                taskResultsDiv.innerHTML = tasksHtml;
+                
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                taskResultsDiv.innerHTML = `
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Make sure the server is running on port 8080.</p>
+                `;
+            }
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Generate My Daily Tasks';
+        });
+    </script>
+</body>
+</html> 

@@ -25,6 +25,14 @@ type TaskResponse struct {
 
 func generateTasks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -62,17 +70,19 @@ func getAITasks(goal, userContext string) ([]string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-2.5-flash")
+	model := client.GenerativeModel("gemini-2.5-flash-lite-preview-06-17")
 
 	prompt := fmt.Sprintf(`Generate exactly 5 simple, actionable daily tasks for someone who wants to %s. 
 
 Context: %s
 
 Requirements:
+- Each task should be completable in 15-30 minutes
 - Tasks should be concrete and specific
 - Focus on small, incremental progress
 - Return only the tasks, one per line
 - No numbering or bullet points
+- Do not use any emojis or special characters
 
 Example format:
 research one specific skill needed for becoming a data scientist
