@@ -62,14 +62,13 @@ func getAITasks(goal, userContext string) ([]string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-2.0-flash-exp")
+	model := client.GenerativeModel("gemini-2.5-flash")
 
 	prompt := fmt.Sprintf(`Generate exactly 5 simple, actionable daily tasks for someone who wants to %s. 
 
 Context: %s
 
 Requirements:
-- Each task should be completable in 15-30 minutes
 - Tasks should be concrete and specific
 - Focus on small, incremental progress
 - Return only the tasks, one per line
