@@ -1,9 +1,10 @@
 {
 	"prompt": {
 		"scopes": [
-			"problem",
+			"ios app",
 			"readme",
-			"contest"
+			"test",
+			"system prompt"
 		]
 	}
 }

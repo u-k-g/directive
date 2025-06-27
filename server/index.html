@@ -52,6 +52,7 @@
     <script>
         let currentGoal = '';
         let currentContext = '';
+        let currentQuestions = [];
         let currentAnswers = [];
         let currentRoadmap = [];
 
@@ -97,6 +98,7 @@
 
         function displayQuestions(data) {
             const questionsDiv = document.getElementById('questionsContent');
+            currentQuestions = [...data.questions];
             
             let html = `<p>${data.message}</p>`;
             
@@ -136,6 +138,7 @@
                         step: 'create_roadmap',
                         goal: currentGoal,
                         context: currentContext,
+                        questions: currentQuestions,
                         answers: currentAnswers
                     })
                 });
@@ -251,6 +254,7 @@
         function startOver() {
             currentGoal = '';
             currentContext = '';
+            currentQuestions = [];
             currentAnswers = [];
             currentRoadmap = [];
             

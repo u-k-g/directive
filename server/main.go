@@ -15,11 +15,12 @@ import (
 )
 
 type TaskRequest struct {
-	Step    string   `json:"step"`
-	Goal    string   `json:"goal"`
-	Context string   `json:"context"`
-	Answers []string `json:"answers,omitempty"`
-	Roadmap []string `json:"roadmap,omitempty"`
+	Step      string   `json:"step"`
+	Goal      string   `json:"goal"`
+	Context   string   `json:"context"`
+	Questions []string `json:"questions,omitempty"`
+	Answers   []string `json:"answers,omitempty"`
+	Roadmap   []string `json:"roadmap,omitempty"`
 }
 
 type TaskResponse struct {
@@ -59,7 +60,7 @@ func generateTasks(w http.ResponseWriter, r *http.Request) {
 	case "analyze_goal":
 		response, err = analyzeGoal(req.Goal, req.Context)
 	case "create_roadmap":
-		response, err = createRoadmap(req.Goal, req.Context, req.Answers)
+		response, err = createRoadmap(req.Goal, req.Context, req.Questions, req.Answers)
 	case "generate_tasks":
 		response, err = generateDailyTasks(req.Goal, req.Context, req.Roadmap)
 	default:
@@ -96,30 +97,32 @@ func analyzeGoal(goal, userContext string) (*TaskResponse, error) {
 
 Their current context: "%s"
 
-Your task is to ask 3-5 strategic questions that will help you create a comprehensive roadmap for achieving this goal.
+Your task is to ask 3-4 simple, direct questions to understand their current state and aspirations. These questions will help you create a personalized roadmap.
 
-Focus on questions about:
-- Specific preferences or choices that affect the approach
-- Timeline and constraints
-- Current skill level or experience
-- Resources available
-- End goals or specific outcomes desired
+Focus on direct questions about:
+- Their current experience and skills (e.g., "Have you written code before?")
+- Any past projects or practical experience (e.g., "Describe any software you've built")
+- Their specific career or end-state goals (e.g., "What kind of company do you want to work at?")
 
 Respond with "QUESTIONS:" followed by your questions, one per line.
 
 Requirements:
-- Ask strategic questions that will shape the roadmap
-- Keep questions clear and direct
+- Ask simple, direct questions that are easy to answer
+- Avoid academic or high-school related questions
+- Focus on practical experience and goals
 - Do not use any emojis or special characters
-- Focus on information that significantly impacts the learning/achievement path
+
+Example input:
+Goal: "become a software engineer"
+Context: "just graduated high school"
 
 Example response format:
 
 QUESTIONS:
-What is your target timeline for achieving this goal?
-Do you prefer self-study or structured courses?
-What is your current experience level with this topic?
-What specific outcome are you hoping to achieve?`, goal, userContext)
+What experience do you have in software engineering?
+If you've built any software, describe it.
+What kind of company do you hope to engineer at?
+Any other details to give me:`, goal, userContext)
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
@@ -160,7 +163,7 @@ What specific outcome are you hoping to achieve?`, goal, userContext)
 	return nil, fmt.Errorf("unexpected response format from AI")
 }
 
-func createRoadmap(goal, userContext string, answers []string) (*TaskResponse, error) {
+func createRoadmap(goal, userContext string, questions, answers []string) (*TaskResponse, error) {
 	ctx := context.Background()
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -176,34 +179,53 @@ func createRoadmap(goal, userContext string, answers []string) (*TaskResponse, e
 
 	model := client.GenerativeModel("gemini-2.5-flash")
 
-	answersText := strings.Join(answers, "\n")
+	var qaBuilder strings.Builder
+	for i, q := range questions {
+		if i < len(answers) {
+			qaBuilder.WriteString(fmt.Sprintf("Question: %s\nAnswer: %s\n\n", q, answers[i]))
+		}
+	}
+	qaText := qaBuilder.String()
 
 	prompt := fmt.Sprintf(`Based on this goal: "%s"
 
 Context: "%s"
 
-And these answers to strategic questions:
+And this Q&A:
 %s
 
-Create a high-level roadmap with 5-8 major milestones for achieving this goal. Each milestone should represent a significant step or phase in the journey.
+Create a high-level roadmap with major milestones for achieving this goal. Each milestone should represent a significant, concrete achievement.
 
 Respond with "ROADMAP:" followed by the milestones, one per line.
 
 Requirements:
-- Each milestone should be a major achievement or phase
+- Each milestone should be a real achievement (e.g., "Build a full-stack web application")
+- Avoid vague, abstract concepts (e.g., "Master core principles")
 - Order them logically from beginning to end
-- Make them specific but not overly detailed
-- Focus on key learning phases or skill development stages
+- Make them specific but not overly specific. do not make them vague or hard to answer
+- Focus on key achievements or shifts in focus
 - Do not use any emojis or special characters
+
+Example input:
+Goal: "become a software engineer"
+Context: "recent graduate with computer science degree, looking for entry-level position"
+Q&A:
+Question: What experience do you have in software engineering?
+Answer: None, just some college projects.
+Question: If you've built any software, describe it.
+Answer: A small web app for a class.
+Question: What kind of company do you hope to engineer at?
+Answer: A fast-paced startup.
 
 Example response format:
 
 ROADMAP:
-Master basic programming fundamentals and syntax
-Build first simple projects and understand core concepts
-Learn advanced programming patterns and best practices
-Develop portfolio projects showcasing different skills
-Apply for entry-level positions and practice interviews`, goal, userContext, answersText)
+Build a personal portfolio website from scratch
+Contribute to an open-source project
+Create a full-stack web application with a database
+Build a mobile application for iOS or Android
+Complete a data structures and algorithms course
+Prepare for and attend technical interviews`, goal, userContext, qaText)
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
@@ -274,20 +296,23 @@ Generate 5 specific daily tasks that will help them progress toward the FIRST mi
 Respond with "TASKS:" followed by exactly 5 tasks, one per line.
 
 Requirements:
-- Each task should be completable in 15-30 minutes
-- Tasks should be concrete and specific
+- Each task should be completable in a day
+- Tasks should be concrete and specific with no vagueness
 - Focus on the first milestone/phase of the roadmap
-- Tasks should be beginner-friendly and actionable today
+- Tasks should be actionable today
 - Do not use any emojis or special characters
+
+Example input:
+Goal: "become a software engineer"
+Context: "recent graduate with computer science degree, looking for entry-level position"
+Roadmap: "Master basic programming fundamentals and syntax", "Build first simple projects", etc.
 
 Example response format:
 
 TASKS:
-research three online programming courses for beginners
-install a code editor and set up your development environment
-complete one simple programming tutorial or exercise
-join one programming community or forum
-write down three specific programming projects you'd like to build`, goal, userContext, roadmapText)
+think of something you want to build or research beginner projects
+follow a programming tutorial all the way through or make signficant progess
+brainstorm even more complex programming projects that you want to build`, goal, userContext, roadmapText)
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
