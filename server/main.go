@@ -15,14 +15,18 @@ import (
 )
 
 type TaskRequest struct {
-	Goal    string `json:"goal"`
-	Context string `json:"context"`
+	Step    string   `json:"step"`
+	Goal    string   `json:"goal"`
+	Context string   `json:"context"`
+	Answers []string `json:"answers,omitempty"`
+	Roadmap []string `json:"roadmap,omitempty"`
 }
 
 type TaskResponse struct {
 	Type      string   `json:"type"`
 	Message   string   `json:"message,omitempty"`
 	Questions []string `json:"questions,omitempty"`
+	Roadmap   []string `json:"roadmap,omitempty"`
 	Tasks     []string `json:"tasks,omitempty"`
 }
 
@@ -48,17 +52,31 @@ func generateTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := getAITasks(req.Goal, req.Context)
+	var response *TaskResponse
+	var err error
+
+	switch req.Step {
+	case "analyze_goal":
+		response, err = analyzeGoal(req.Goal, req.Context)
+	case "create_roadmap":
+		response, err = createRoadmap(req.Goal, req.Context, req.Answers)
+	case "generate_tasks":
+		response, err = generateDailyTasks(req.Goal, req.Context, req.Roadmap)
+	default:
+		http.Error(w, "invalid step", http.StatusBadRequest)
+		return
+	}
+
 	if err != nil {
-		log.Printf("error generating tasks: %v", err)
-		http.Error(w, "failed to generate tasks", http.StatusInternalServerError)
+		log.Printf("error in step %s: %v", req.Step, err)
+		http.Error(w, "failed to process request", http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(response)
 }
 
-func getAITasks(goal, userContext string) (*TaskResponse, error) {
+func analyzeGoal(goal, userContext string) (*TaskResponse, error) {
 	ctx := context.Background()
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -78,46 +96,30 @@ func getAITasks(goal, userContext string) (*TaskResponse, error) {
 
 Their current context: "%s"
 
-Analyze if you have enough specific information to create 5 meaningful, actionable daily tasks. Consider:
-- Is the goal specific enough?
-- Is there enough context about their current situation?
-- Are there important choices or preferences that would significantly change the approach?
+Your task is to ask 3-5 strategic questions that will help you create a comprehensive roadmap for achieving this goal.
 
-If you need more information, respond with "QUESTIONS:" followed by 2-4 specific questions that would help you create better tasks.
+Focus on questions about:
+- Specific preferences or choices that affect the approach
+- Timeline and constraints
+- Current skill level or experience
+- Resources available
+- End goals or specific outcomes desired
 
-If you have enough information, respond with "TASKS:" followed by exactly 5 simple, actionable daily tasks.
-DO NOT REPEAT QUESTIONS.
-IMPORTANT: If the user answered "I don't know" to any question that is core to achieving their goal, create tasks specifically aimed at helping them discover the answer to that question. For example, if they don't know which programming language to learn for software development, the tasks should focus on researching and comparing different programming languages.
+Respond with "QUESTIONS:" followed by your questions, one per line.
 
-Requirements for tasks:
-- Each task should be completable in 15-30 minutes
-- Tasks should be concrete and specific
-- Focus on small, incremental progress
-- Do not use any emojis or special characters
-- One task per line
-- If user said "I don't know" to core questions, prioritize tasks that help them find those answers
-
-Requirements for questions:
-- Ask about specific details that would change your task recommendations
-- Focus on the most important missing information
+Requirements:
+- Ask strategic questions that will shape the roadmap
 - Keep questions clear and direct
 - Do not use any emojis or special characters
+- Focus on information that significantly impacts the learning/achievement path
 
-Example response formats:
+Example response format:
 
 QUESTIONS:
-Which dialect of Arabic are you most interested in learning?
-Do you have any specific goals for using Arabic?
-Are you planning to travel to an Arabic-speaking country?
-
-OR
-
-TASKS:
-research one specific skill needed for becoming a data scientist
-identify one person in your network who works in data science
-read one article about machine learning fundamentals
-practice one Python coding exercise
-reflect on what you learned today`, goal, userContext)
+What is your target timeline for achieving this goal?
+Do you prefer self-study or structured courses?
+What is your current experience level with this topic?
+What specific outcome are you hoping to achieve?`, goal, userContext)
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
@@ -150,10 +152,154 @@ reflect on what you learned today`, goal, userContext)
 
 		return &TaskResponse{
 			Type:      "questions",
-			Message:   "I need more information to create the best tasks for you:",
+			Message:   "I need to understand your specific situation to create the best roadmap:",
 			Questions: questions,
 		}, nil
 	}
+
+	return nil, fmt.Errorf("unexpected response format from AI")
+}
+
+func createRoadmap(goal, userContext string, answers []string) (*TaskResponse, error) {
+	ctx := context.Background()
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
+	}
+
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel("gemini-2.5-flash")
+
+	answersText := strings.Join(answers, "\n")
+
+	prompt := fmt.Sprintf(`Based on this goal: "%s"
+
+Context: "%s"
+
+And these answers to strategic questions:
+%s
+
+Create a high-level roadmap with 5-8 major milestones for achieving this goal. Each milestone should represent a significant step or phase in the journey.
+
+Respond with "ROADMAP:" followed by the milestones, one per line.
+
+Requirements:
+- Each milestone should be a major achievement or phase
+- Order them logically from beginning to end
+- Make them specific but not overly detailed
+- Focus on key learning phases or skill development stages
+- Do not use any emojis or special characters
+
+Example response format:
+
+ROADMAP:
+Master basic programming fundamentals and syntax
+Build first simple projects and understand core concepts
+Learn advanced programming patterns and best practices
+Develop portfolio projects showcasing different skills
+Apply for entry-level positions and practice interviews`, goal, userContext, answersText)
+
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate content: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("no content generated")
+	}
+
+	content := fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0])
+	content = strings.TrimSpace(content)
+
+	if strings.HasPrefix(content, "ROADMAP:") {
+		roadmapText := strings.TrimPrefix(content, "ROADMAP:")
+		roadmapText = strings.TrimSpace(roadmapText)
+		lines := strings.Split(roadmapText, "\n")
+
+		var roadmap []string
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				roadmap = append(roadmap, line)
+			}
+		}
+
+		if len(roadmap) == 0 {
+			return nil, fmt.Errorf("no roadmap extracted from response")
+		}
+
+		return &TaskResponse{
+			Type:    "roadmap",
+			Message: "Here's your personalized roadmap. You can edit any milestone before we create your daily tasks:",
+			Roadmap: roadmap,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("unexpected response format from AI")
+}
+
+func generateDailyTasks(goal, userContext string, roadmap []string) (*TaskResponse, error) {
+	ctx := context.Background()
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
+	}
+
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel("gemini-2.5-flash")
+
+	roadmapText := strings.Join(roadmap, "\n")
+
+	prompt := fmt.Sprintf(`Based on this goal: "%s"
+
+Context: "%s"
+
+And this confirmed roadmap:
+%s
+
+Generate 5 specific daily tasks that will help them progress toward the FIRST milestone in their roadmap. Focus on concrete, actionable steps they can take today to start their journey.
+
+Respond with "TASKS:" followed by exactly 5 tasks, one per line.
+
+Requirements:
+- Each task should be completable in 15-30 minutes
+- Tasks should be concrete and specific
+- Focus on the first milestone/phase of the roadmap
+- Tasks should be beginner-friendly and actionable today
+- Do not use any emojis or special characters
+
+Example response format:
+
+TASKS:
+research three online programming courses for beginners
+install a code editor and set up your development environment
+complete one simple programming tutorial or exercise
+join one programming community or forum
+write down three specific programming projects you'd like to build`, goal, userContext, roadmapText)
+
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate content: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("no content generated")
+	}
+
+	content := fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0])
+	content = strings.TrimSpace(content)
 
 	if strings.HasPrefix(content, "TASKS:") {
 		taskText := strings.TrimPrefix(content, "TASKS:")

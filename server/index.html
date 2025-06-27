@@ -7,50 +7,63 @@
 </head>
 <body>
     <h1>Directive</h1>
-    <p>Generate 5 simple daily tasks to bring you closer to your goals</p>
+    <p>Create a personalized roadmap and daily tasks to achieve your goals</p>
     
-    <form id="taskForm">
-        <div>
-            <label for="goal">What do you want to become or achieve?</label>
-            <input type="text" id="goal" name="goal" placeholder="e.g., become a software engineer" required>
-        </div>
-        
-        <div>
-            <label for="context">Tell us about your current situation:</label>
-            <textarea id="context" name="context" placeholder="e.g., recent graduate with computer science degree" required></textarea>
-        </div>
-        
-        <button type="submit" id="submitBtn">Generate My Daily Tasks</button>
-    </form>
-    
-    <div id="results" style="display: none;">
-        <div id="loading">
-            <p>Analyzing your goal and context...</p>
-        </div>
-        <div id="taskResults"></div>
+    <div id="step1" style="display: block;">
+        <h2>Step 1: Tell us your goal</h2>
+        <form id="goalForm">
+            <div>
+                <label for="goal">What do you want to become or achieve?</label>
+                <input type="text" id="goal" name="goal" placeholder="e.g., become a software engineer" required>
+            </div>
+            
+            <div>
+                <label for="context">Tell us about your current situation:</label>
+                <textarea id="context" name="context" placeholder="e.g., recent graduate with computer science degree" required></textarea>
+            </div>
+            
+            <button type="submit" id="goalBtn">Analyze My Goal</button>
+        </form>
+    </div>
+
+    <div id="step2" style="display: none;">
+        <h2>Step 2: Strategic Questions</h2>
+        <div id="questionsContent"></div>
+        <button onclick="submitAnswers()" id="answersBtn">Create My Roadmap</button>
+    </div>
+
+    <div id="step3" style="display: none;">
+        <h2>Step 3: Your Roadmap</h2>
+        <p>Review and edit your personalized roadmap:</p>
+        <div id="roadmapContent"></div>
+        <button onclick="generateTasks()" id="roadmapBtn">Generate Today's Tasks</button>
+    </div>
+
+    <div id="step4" style="display: none;">
+        <h2>Step 4: Today's Tasks</h2>
+        <div id="tasksContent"></div>
+        <button onclick="startOver()">Start Over</button>
+    </div>
+
+    <div id="loading" style="display: none;">
+        <p id="loadingMessage">Processing...</p>
     </div>
 
     <script>
-        let conversationContext = '';
-        
-        document.getElementById('taskForm').addEventListener('submit', async function(e) {
+        let currentGoal = '';
+        let currentContext = '';
+        let currentAnswers = [];
+        let currentRoadmap = [];
+
+        document.getElementById('goalForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            await processRequest();
+            currentGoal = document.getElementById('goal').value;
+            currentContext = document.getElementById('context').value;
+            await analyzeGoal();
         });
 
-        async function processRequest() {
-            const goal = document.getElementById('goal').value;
-            const context = document.getElementById('context').value + conversationContext;
-            const resultsDiv = document.getElementById('results');
-            const loadingDiv = document.getElementById('loading');
-            const taskResultsDiv = document.getElementById('taskResults');
-            const submitBtn = document.getElementById('submitBtn');
-            
-            resultsDiv.style.display = 'block';
-            loadingDiv.style.display = 'block';
-            taskResultsDiv.innerHTML = '';
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Processing...';
+        async function analyzeGoal() {
+            showLoading('Analyzing your goal...');
             
             try {
                 const response = await fetch('http://localhost:8080/api/tasks', {
@@ -58,7 +71,11 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ goal, context })
+                    body: JSON.stringify({
+                        step: 'analyze_goal',
+                        goal: currentGoal,
+                        context: currentContext
+                    })
                 });
                 
                 if (!response.ok) {
@@ -66,82 +83,184 @@
                 }
                 
                 const data = await response.json();
-                
-                loadingDiv.style.display = 'none';
+                hideLoading();
                 
                 if (data.type === 'questions') {
                     displayQuestions(data);
-                } else if (data.type === 'tasks') {
+                }
+                
+            } catch (error) {
+                hideLoading();
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function displayQuestions(data) {
+            const questionsDiv = document.getElementById('questionsContent');
+            
+            let html = `<p>${data.message}</p>`;
+            
+            data.questions.forEach((question, index) => {
+                html += `
+                    <div style="margin-bottom: 15px;">
+                        <label><strong>${index + 1}. ${question}</strong></label>
+                        <textarea id="answer${index}" placeholder="Your answer..." rows="2" style="width: 100%; margin-top: 5px;"></textarea>
+                    </div>
+                `;
+            });
+            
+            questionsDiv.innerHTML = html;
+            
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+        }
+
+        async function submitAnswers() {
+            const answerElements = document.querySelectorAll('#questionsContent textarea');
+            currentAnswers = [];
+            
+            answerElements.forEach(textarea => {
+                const answer = textarea.value.trim();
+                currentAnswers.push(answer || "I don't know");
+            });
+
+            showLoading('Creating your roadmap...');
+
+            try {
+                const response = await fetch('http://localhost:8080/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        step: 'create_roadmap',
+                        goal: currentGoal,
+                        context: currentContext,
+                        answers: currentAnswers
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                hideLoading();
+                
+                if (data.type === 'roadmap') {
+                    displayRoadmap(data);
+                }
+                
+            } catch (error) {
+                hideLoading();
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function displayRoadmap(data) {
+            const roadmapDiv = document.getElementById('roadmapContent');
+            currentRoadmap = [...data.roadmap];
+            
+            let html = `<p>${data.message}</p>`;
+            
+            html += '<div id="milestones">';
+            data.roadmap.forEach((milestone, index) => {
+                html += `
+                    <div style="margin-bottom: 10px;">
+                        <label><strong>Milestone ${index + 1}:</strong></label>
+                        <textarea id="milestone${index}" style="width: 100%; margin-top: 5px;" rows="2">${milestone}</textarea>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            roadmapDiv.innerHTML = html;
+            
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'block';
+        }
+
+        async function generateTasks() {
+            // Get updated roadmap from textareas
+            const milestoneElements = document.querySelectorAll('#milestones textarea');
+            currentRoadmap = [];
+            
+            milestoneElements.forEach(textarea => {
+                currentRoadmap.push(textarea.value.trim());
+            });
+
+            showLoading('Generating your daily tasks...');
+
+            try {
+                const response = await fetch('http://localhost:8080/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        step: 'generate_tasks',
+                        goal: currentGoal,
+                        context: currentContext,
+                        roadmap: currentRoadmap
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                hideLoading();
+                
+                if (data.type === 'tasks') {
                     displayTasks(data);
                 }
                 
             } catch (error) {
-                loadingDiv.style.display = 'none';
-                taskResultsDiv.innerHTML = `
-                    <p><strong>Error:</strong> ${error.message}</p>
-                    <p>Make sure the server is running on port 8080.</p>
-                `;
+                hideLoading();
+                alert('Error: ' + error.message);
             }
-            
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Generate My Daily Tasks';
-        }
-
-        function displayQuestions(data) {
-            const taskResultsDiv = document.getElementById('taskResults');
-            
-            let questionsHtml = `<h3>${data.message}</h3>`;
-            
-            questionsHtml += '<div id="questionsList">';
-            data.questions.forEach((question, index) => {
-                questionsHtml += `
-                    <div>
-                        <p><strong>${index + 1}. ${question}</strong></p>
-                        <textarea id="answer${index}" placeholder="Your answer..." rows="2" style="width: 100%; margin-bottom: 10px;"></textarea>
-                    </div>
-                `;
-            });
-            questionsHtml += '</div>';
-            
-            questionsHtml += '<button onclick="submitAnswers(' + data.questions.length + ')">Continue with these answers</button>';
-            
-            taskResultsDiv.innerHTML = questionsHtml;
         }
 
         function displayTasks(data) {
-            const taskResultsDiv = document.getElementById('taskResults');
+            const tasksDiv = document.getElementById('tasksContent');
             
-            const tasksHtml = `
-                <h3>Your Daily Tasks:</h3>
+            const html = `
+                <p>Here are your 5 daily tasks to get started on your first milestone:</p>
                 <ol>
                     ${data.tasks.map(task => `<li>${task}</li>`).join('')}
                 </ol>
-                <button onclick="startOver()">Generate New Tasks</button>
+                <p><strong>Focus on these tasks today to begin your journey!</strong></p>
             `;
             
-            taskResultsDiv.innerHTML = tasksHtml;
+            tasksDiv.innerHTML = html;
+            
+            document.getElementById('step3').style.display = 'none';
+            document.getElementById('step4').style.display = 'block';
         }
 
-        function submitAnswers(questionCount) {
-            let answers = [];
-            for (let i = 0; i < questionCount; i++) {
-                const answer = document.getElementById(`answer${i}`).value.trim();
-                if (answer) {
-                    answers.push(answer);
-                } else {
-                    answers.push("I don't know");
-                }
-            }
-            
-            conversationContext += '\n\nAdditional context from follow-up questions:\n' + answers.join('\n');
-            processRequest();
+        function showLoading(message) {
+            document.getElementById('loadingMessage').textContent = message;
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
         }
 
         function startOver() {
-            conversationContext = '';
-            document.getElementById('results').style.display = 'none';
+            currentGoal = '';
+            currentContext = '';
+            currentAnswers = [];
+            currentRoadmap = [];
+            
             document.getElementById('goal').value = '';
             document.getElementById('context').value = '';
+            
+            document.getElementById('step1').style.display = 'block';
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'none';
+            document.getElementById('step4').style.display = 'none';
         }
     </script>
 </body>

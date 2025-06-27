@@ -1,0 +1,9 @@
+{
+	"prompt": {
+		"scopes": [
+			"problem",
+			"readme",
+			"contest"
+		]
+	}
+}
