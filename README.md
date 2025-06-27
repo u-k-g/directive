@@ -1,24 +1,69 @@
-# Directive
+# directive
 
-An app where you tell it your goal, it makes a personalized roadmap with you, and then gives you five dead simple tasks every day to get you to your goal.
+<details open>
+<summary><strong>overview</strong></summary>
 
-## Features
+`directive` is an app where you explain your goal, it makes a personalized roadmap with you, then gives you five dead simple tasks every day to get you to your goal.
 
--   **Interactive Roadmap Planning:** Work with the AI to create a personalized, step-by-step roadmap to achieve your ambition.
--   **Five Daily Tasks:** Get five simple, clear tasks every single day. No more guessing what to do next.
--   **Smart Reminders:** Set up gentle nudges to keep you on track with your daily tasks.
--   **Progress Updates:** Keep the AI informed on your progress with simple daily or weekly updates, ensuring your tasks and roadmap stay relevant.
--   **Editable Plan:** Your goals can change. Your roadmap can too. Edit your plan anytime.
+</details>
 
-## Usage
+<details open>
+<summary><strong>who this is for</strong></summary>
 
-1.  **Define Your Ambition:** Tell the app what you want to achieve.
-2.  **Build Your Roadmap:** Answer a few simple questions to create a clear plan.
-3.  **Complete Your Daily Tasks:** Focus on the five small tasks you get each day.
-4.  **Track Your Progress:** Check in to let the app know how you're doing, and watch your progress unfold.
+- people aged 16-26 who feel stuck or confused about achieving their goals
+- anyone overwhelmed by big ambitions but unsure where to start
+- those who need structure but hate complex planning systems
+- students, early professionals, or career changers seeking direction
 
-## Application
+</details>
 
-Directive is designed to fit seamlessly into your daily life. It's for those moments when you feel ambitious but aren't sure where to start.
+<details open>
+<summary><strong>how it works</strong></summary>
 
-Instead of feeling overwhelmed by a big goal, you just open the app and see five simple things to do today. It turns abstract ambition into concrete, daily action. Whether you're a student figuring out your career, a creative starting a new project, or anyone looking to build a new skill, Directive acts as your personal guide, helping you make steady, meaningful progress every day. 
+1. **tell us your goal** – what do you want to achieve?
+2. **answer a few questions** – we ask 3-4 strategic questions to understand your situation
+3. **review your roadmap** – we create concrete milestones (you can edit them)
+4. **get tasks for the day** – receive 5 actionable tasks focused on your first milestone
+5. **take action** – complete tasks, track progress, repeat
+
+no vague advice like "network more" or "learn fundamentals" – every task is something you can actually do today.
+
+</details>
+
+<details open>
+<summary><strong>the problem we solve</strong></summary>
+
+most goal-setting apps give you either:
+- vague advice that sounds helpful but isn't actionable
+- complex systems that require more planning than doing
+
+directive cuts through this. it's designed for people who know what they want but are paralyzed by not knowing where to start.
+
+</details>
+
+<details open>
+<summary><strong>why directive works</strong></summary>
+
+**focuses on the next step, not the whole journey**
+- no overwhelming roadmaps
+- tasks you can complete in one day
+- immediate action over endless planning
+
+**asks the right questions**
+- understands your actual situation
+- focuses on practical experience
+- avoids academic background noise
+
+**stays concrete**
+- "build a portfolio website" not "master core principles"
+- "apply to 3 specific companies" not "improve networking"
+- "record a 2-minute demo video" not "enhance presentation skills"
+
+</details>
+
+<details>
+<summary><strong>license</strong></summary>
+
+this project is in early development. licensing details will be added as the project evolves.
+
+</details> 
